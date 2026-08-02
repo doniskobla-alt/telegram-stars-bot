@@ -19,7 +19,9 @@ from aiogram.types import (
 from aiogram.enums import ParseMode
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "8806014952:AAE0yOs6STrftd-FBpwcXUB-wm7C0XhwbwA"
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 5598701749
 
 # Путь к QR-коду (потом скажу куда положить файл)
