@@ -25,7 +25,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 5598701749
 
 # Путь к QR-коду (потом скажу куда положить файл)
-QR_PATH = "/storage/emulated/0/Pictures/Telegram/qr.png"
+QR_PATH = "qr.png"
 
 PRODUCTS = {
     50: 72,
