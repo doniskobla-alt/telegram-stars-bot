@@ -247,60 +247,60 @@ def gifts_keyboard() -> InlineKeyboardMarkup:
 inline_keyboard=[
 [
 InlineKeyboardButton(
-text="145 сом",
+text="99 сом",
                     icon_custom_emoji_id="5345935030143196497",
                     callback_data="gift_tree"
                 ),
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5379850840691476775",
                     callback_data="gift_santa_bear"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5224628072619216265",
                     callback_data="gift_heart"
                 ),
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5226661632259691727",
                     callback_data="gift_blue_bear"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5289761157173775507",
                     callback_data="gift_pink_bear"
                 ),
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5317000922096769303",
                     callback_data="gift_leprechaun"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5359736160224586485",
                     callback_data="gift_clown"
                 ),
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5393309541620291208",
                     callback_data="gift_bunny"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5447213743417105726",
                     callback_data="gift_worker"
                 ),
                 InlineKeyboardButton(
-                    text="145 сом",
+                    text="99 сом",
                     icon_custom_emoji_id="5397971251878732060",
                     callback_data="gift_football"
                 )
@@ -492,7 +492,7 @@ async def menu_gifts(callback: CallbackQuery):
 
     await callback.message.edit_text(
         "<tg-emoji emoji-id='5226661632259691727'>☺</tg-emoji> <b>Удалённые подарки</b>\n\n"
-        "🎁 Все подарки стоят <b>145 сом</b>.\n\n"
+        "🎁 Все подарки стоят <b>99 сом</b>.\n\n"
         "👇 Выберите подарок:",
         parse_mode=ParseMode.HTML,
         reply_markup=gifts_keyboard()
@@ -609,24 +609,24 @@ def gifts_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5345935030143196497", callback_data="gift_tree"),
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5379850840691476775", callback_data="gift_santa_bear"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5345935030143196497", callback_data="gift_tree"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5379850840691476775", callback_data="gift_santa_bear"),
             ],
             [
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5224628072619216265", callback_data="gift_heart"),
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5226661632259691727", callback_data="gift_heart_bear"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5224628072619216265", callback_data="gift_heart"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5226661632259691727", callback_data="gift_heart_bear"),
             ],
             [
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5289761157173775507", callback_data="gift_pink_bear"),
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5317000922096769303", callback_data="gift_leprechaun"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5289761157173775507", callback_data="gift_pink_bear"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5317000922096769303", callback_data="gift_leprechaun"),
             ],
             [
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5359736160224586485", callback_data="gift_clown"),
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5393309541620291208", callback_data="gift_bunny"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5359736160224586485", callback_data="gift_clown"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5393309541620291208", callback_data="gift_bunny"),
             ],
             [
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5447213743417105726", callback_data="gift_worker"),
-                InlineKeyboardButton(text="145 сом", icon_custom_emoji_id="5397971251878732060", callback_data="gift_football"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5447213743417105726", callback_data="gift_worker"),
+                InlineKeyboardButton(text="99 сом", icon_custom_emoji_id="5397971251878732060", callback_data="gift_football"),
             ],
             [
                 InlineKeyboardButton(
@@ -657,13 +657,13 @@ async def gift_buy(callback: CallbackQuery, state: FSMContext):
     await state.update_data(
         order_type="gift",
         gift=gift,
-        price=145
+        price=99
     )
     await state.set_state(OrderStates.waiting_gift_username)
 
     await callback.message.answer(
         "<tg-emoji emoji-id='5370781982886220096'>☺</tg-emoji><b>Удалённый подарок</b>\n\n"
-        "<tg-emoji emoji-id='5262495450648300372'>☺</tg-emoji> Стоимость: <b>145 сом</b>\n\n"
+        "<tg-emoji emoji-id='5262495450648300372'>☺</tg-emoji> Стоимость: <b>99 сом</b>\n\n"
         "<tg-emoji emoji-id='5879770735999717115'>☺</tg-emoji>Теперь отправьте username получателя.\n\n"
         "Пример:\n"
         "<code>@skobla</code>",
@@ -683,7 +683,7 @@ async def gift_username(message: Message, state: FSMContext):
     await state.set_state(OrderStates.waiting_gift_text)
 
     await message.answer(
-        "<tg-emoji emoji-id='5258500400918587241'>☺</tg-emoji><b>Теперь отправьте подпись к подарку.</b>\n\n"
+        "<tg-emoji emoji-id='5258500400918587241'>☺</tg-emoji><b>Теперь отправьте любую подпись к подарку.</b>\n\n"
         "Если подпись не нужна — отправьте\n"
         "<code>-</code>",
         parse_mode=ParseMode.HTML
