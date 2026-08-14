@@ -50,6 +50,16 @@ logger = logging.getLogger(__name__)
 router = Router()
 db: Optional[aiosqlite.Connection] = None
 
+from aiogram.dispatcher.middlewares.base import BaseMiddleware
+
+
+class BanMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        user = getattr(event, "from_user", None)
+        if user and await is_banned(user.id):
+            return
+        return await handler(event, data)
+
 
 class OrderStates(StatesGroup):
     waiting_custom_stars = State()
@@ -82,6 +92,15 @@ async def init_db():
         await db.execute("ALTER TABLE orders ADD COLUMN product_type TEXT DEFAULT 'stars'")
     except:
         pass
+        
+    await db.execute("""
+    CREATE TABLE IF NOT EXISTS banned_users (
+        user_id INTEGER PRIMARY KEY,
+        reason TEXT,
+        banned_at TEXT NOT NULL
+    )
+""")
+
     await db.commit()
 
 
@@ -182,6 +201,30 @@ async def get_user_stats(user_id: int):
 
     row = await cursor.fetchone()
     return row[0], row[1]
+ 
+async def is_banned(user_id: int) -> bool:
+    cursor = await db.execute(
+        "SELECT 1 FROM banned_users WHERE user_id = ?",
+        (user_id,)
+    )
+    return await cursor.fetchone() is not None
+
+
+async def ban_user(user_id: int, reason: str = ""):
+    now = datetime.now().isoformat()
+    await db.execute(
+        "INSERT OR REPLACE INTO banned_users (user_id, reason, banned_at) VALUES (?, ?, ?)",
+        (user_id, reason, now)
+    )
+    await db.commit()
+
+
+async def unban_user(user_id: int):
+    await db.execute(
+        "DELETE FROM banned_users WHERE user_id = ?",
+        (user_id,)
+    )
+    await db.commit()
 
 def catalog_keyboard() -> InlineKeyboardMarkup:
     buttons = []
@@ -385,6 +428,8 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
+    if await is_banned(message.from_user.id):
+        return
     await state.clear()
 
     text = (
@@ -912,6 +957,51 @@ async def cmd_stats(message: Message):
         f"⏳ Ожидают выдачи: <b>{pending}</b>",
         parse_mode=ParseMode.HTML
     )
+    
+@router.message(Command("ban"))
+async def cmd_ban(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    parts = message.text.split(maxsplit=2)
+
+    if len(parts) < 2:
+        await message.answer("Использование:\n/ban ID причина")
+        return
+
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("ID должен быть числом.")
+        return
+
+    reason = parts[2] if len(parts) > 2 else ""
+
+    await ban_user(user_id, reason)
+
+    await message.answer(f"✅ Пользователь {user_id} забанен.")
+
+
+@router.message(Command("unban"))
+async def cmd_unban(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    parts = message.text.split(maxsplit=1)
+
+    if len(parts) < 2:
+        await message.answer("Использование:\n/unban ID")
+        return
+
+    try:
+        user_id = int(parts[1])
+    except ValueError:
+        await message.answer("ID должен быть числом.")
+        return
+
+    await unban_user(user_id)
+
+    await message.answer(f"✅ Пользователь {user_id} разбанен.")
 
 @router.message(OrderStates.waiting_recipient)
 async def recipient_input(message: Message, state: FSMContext):
@@ -1054,6 +1144,8 @@ async def main():
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
+    dp.message.middleware(BanMiddleware())
+    dp.callback_query.middleware(BanMiddleware())
     logger.info("Бот запущен")
     await dp.start_polling(bot)
 
