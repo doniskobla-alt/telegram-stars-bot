@@ -59,7 +59,35 @@ class BanMiddleware(BaseMiddleware):
         if user and await is_banned(user.id):
             return
         return await handler(event, data)
+        
+class SleepMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        user = getattr(event, "from_user", None)
 
+        if user and user.id != ADMIN_ID and await is_sleep_mode():
+
+            sleep_text = (
+                '<tg-emoji emoji-id="4958941455818163141">☺</tg-emoji> <b>Магазин в режиме сна</b>\n\n'
+                "Бот сейчас спит, поэтому не может быстро обработать заказ.\n\n"
+                '<tg-emoji emoji-id="6323361327767099558">☺</tg-emoji> <b>Приём и выдача заказов возобновится в 8-9 утра по KGZ.</b>\n\n'
+                "Спасибо за понимание ❤️"
+            )
+
+            if isinstance(event, Message):
+                await event.answer(
+                    sleep_text,
+                    parse_mode=ParseMode.HTML
+                )
+                return
+
+            if isinstance(event, CallbackQuery):
+                await event.answer(
+                    "🌙 Магазин сейчас закрыт",
+                    show_alert=True
+                )
+                return
+
+        return await handler(event, data)
 
 class OrderStates(StatesGroup):
     waiting_custom_stars = State()
@@ -92,6 +120,18 @@ async def init_db():
         await db.execute("ALTER TABLE orders ADD COLUMN product_type TEXT DEFAULT 'stars'")
     except:
         pass
+        
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS bot_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+
+    await db.execute("""
+        INSERT OR IGNORE INTO bot_settings (key, value)
+        VALUES ('sleep_mode', '0')
+    """)
         
     await db.execute("""
     CREATE TABLE IF NOT EXISTS banned_users (
@@ -138,6 +178,26 @@ async def complete_order(order_id: int) -> bool:
     await db.commit()
     return True
 
+async def is_sleep_mode() -> bool:
+    cursor = await db.execute(
+        "SELECT value FROM bot_settings WHERE key = 'sleep_mode'"
+    )
+    row = await cursor.fetchone()
+    return bool(row and row[0] == "1")
+
+
+async def set_sleep_mode(enabled: bool):
+    value = "1" if enabled else "0"
+
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO bot_settings (key, value)
+        VALUES ('sleep_mode', ?)
+        """,
+        (value,)
+    )
+
+    await db.commit()
 
 def calculate_order_profit(order: dict) -> int:
     product_type = order.get("product_type", "stars")
@@ -1002,6 +1062,31 @@ async def cmd_unban(message: Message):
     await unban_user(user_id)
 
     await message.answer(f"✅ Пользователь {user_id} разбанен.")
+    
+@router.message(Command("sleep"))
+async def cmd_sleep(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    await set_sleep_mode(True)
+
+    await message.answer(
+        "🌙 Режим сна включён.\n"
+        "Теперь новые заказы временно приниматься не будут."
+    )
+
+
+@router.message(Command("wake"))
+async def cmd_wake(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    await set_sleep_mode(False)
+
+    await message.answer(
+        "☀️ Режим сна выключен.\n"
+        "Магазин снова открыт."
+    )
 
 @router.message(OrderStates.waiting_recipient)
 async def recipient_input(message: Message, state: FSMContext):
@@ -1143,9 +1228,15 @@ async def main():
     await init_db()
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
+
     dp.include_router(router)
+
     dp.message.middleware(BanMiddleware())
     dp.callback_query.middleware(BanMiddleware())
+
+    dp.message.middleware(SleepMiddleware())
+    dp.callback_query.middleware(SleepMiddleware())
+
     logger.info("Бот запущен")
     await dp.start_polling(bot)
 
