@@ -115,6 +115,10 @@ async def init_db():
             completed_at TEXT
         )
     """)
+    
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 219)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 219 WHERE name = 'orders' AND seq < 219")  
+    
     try:
         await db.execute("ALTER TABLE orders ADD COLUMN product_type TEXT DEFAULT 'stars'")
     except:
