@@ -21,7 +21,7 @@ from aiogram.enums import ParseMode
 # ==================== НАСТРОЙКИ ====================
 import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8806014952:AAHVWcEeAGc8TdoCfOcLZQihF_Z_IbcDKpc")
 ADMIN_ID = 5598701749
 
 # Путь к QR-коду (потом скажу куда положить файл)
@@ -97,8 +97,7 @@ class OrderStates(StatesGroup):
     waiting_payment_check = State()
 
     waiting_premium_username = State()
-
-
+    
 async def init_db():
     global db
     db = await aiosqlite.connect("orders.db")
@@ -285,6 +284,7 @@ async def unban_user(user_id: int):
         (user_id,)
     )
     await db.commit()
+    
 
 def catalog_keyboard() -> InlineKeyboardMarkup:
     buttons = []
@@ -448,6 +448,7 @@ def complete_keyboard(order_id: int) -> InlineKeyboardMarkup:
             ]
         ]
     )
+    
     
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -708,6 +709,7 @@ GIFTS = {
     "bunny": {"name": "Зайчик", "emoji": "5393309541620291208"},
     "worker": {"name": "Рабочий", "emoji": "5447213743417105726"},
     "football": {"name": "Футбольный мишка", "emoji": "5397971251878732060"},
+    "combat_bear": {"name": "Мишка боевой", "emoji": "5470129614439362117"},
 }
 
 def gifts_keyboard() -> InlineKeyboardMarkup:
@@ -734,6 +736,11 @@ def gifts_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="85 сом", icon_custom_emoji_id="5397971251878732060", callback_data="gift_football"),
             ],
             [
+            InlineKeyboardButton(
+    text="85 сом",
+    icon_custom_emoji_id="5470129614439362117",
+    callback_data="gift_masked_bear"
+),
                 InlineKeyboardButton(
                     text="Назад",
                     icon_custom_emoji_id="5280911767902378209",
@@ -1087,7 +1094,7 @@ async def cmd_wake(message: Message):
         "☀️ Режим сна выключен.\n"
         "Магазин снова открыт."
     )
-
+    
 @router.message(OrderStates.waiting_recipient)
 async def recipient_input(message: Message, state: FSMContext):
 
