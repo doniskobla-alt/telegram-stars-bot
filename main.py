@@ -21,7 +21,7 @@ from aiogram.enums import ParseMode
 # ==================== НАСТРОЙКИ ====================
 import os
 
-BOT_TOKEN = "8806014952:AAHVWcEeAGc8TdoCfOcLZQihF_Z_IbcDKpc"
+BOT_TOKEN = "8806014952:AAEOdo5oRocCptUJrT5Yx23nnSTG7pb-_0I"
 ADMIN_ID = 5598701749
 
 # Путь к QR-коду (потом скажу куда положить файл)
