@@ -116,8 +116,17 @@ async def init_db():
         )
     """)
     
-    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 319)")
-    await db.execute("UPDATE sqlite_sequence SET seq = 319 WHERE name = 'orders' AND seq < 319")  
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 456)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 456 WHERE name = 'orders' AND seq < 456")  
+    
+    await db.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY,
+        username TEXT,
+        first_name TEXT,
+        last_seen TEXT NOT NULL
+    )
+""")
     
     try:
         await db.execute("ALTER TABLE orders ADD COLUMN product_type TEXT DEFAULT 'stars'")
@@ -289,6 +298,26 @@ async def unban_user(user_id: int):
     )
     await db.commit()
     
+async def save_user(user):
+    now = datetime.now().isoformat()
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO users (user_id, username, first_name, last_seen)
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            user.id,
+            user.username or "",
+            user.first_name or "",
+            now
+        )
+    )
+    await db.commit()
+    
+async def get_all_user_ids():
+    cursor = await db.execute("SELECT user_id FROM users")
+    rows = await cursor.fetchall()
+    return [row[0] for row in rows]
 
 def catalog_keyboard() -> InlineKeyboardMarkup:
     buttons = []
@@ -495,6 +524,8 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
 async def cmd_start(message: Message, state: FSMContext):
     if await is_banned(message.from_user.id):
         return
+
+    await save_user(message.from_user)
     await state.clear()
 
     text = (
@@ -1097,6 +1128,39 @@ async def cmd_wake(message: Message):
     await message.answer(
         "☀️ Режим сна выключен.\n"
         "Магазин снова открыт."
+    )
+    
+@router.message(Command("broadcast"))
+async def cmd_broadcast(message: Message, bot: Bot):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer("Использование:\n/broadcast текст")
+        return
+
+    text = parts[1].strip()
+
+    user_ids = await get_all_user_ids()
+    if not user_ids:
+        await message.answer("Пользователей пока нет.")
+        return
+
+    sent = 0
+    failed = 0
+
+    for user_id in user_ids:
+        try:
+            await bot.send_message(user_id, text)
+            sent += 1
+        except Exception:
+            failed += 1
+
+    await message.answer(
+        f"Рассылка завершена.\n"
+        f"Отправлено: {sent}\n"
+        f"Не дошло: {failed}"
     )
     
 @router.message(OrderStates.waiting_recipient)
