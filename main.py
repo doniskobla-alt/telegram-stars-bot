@@ -30,17 +30,17 @@ QR_PATH = "qr.png"
 PRODUCTS = {
     50: 72,
     100: 145,
-    150: 217,
-    250: 362,
+    150: 219,
+    250: 364,
     500: 725,
     1000: 1450,
-    2500: 3625
+    2500: 3649,
 }
 
 PREMIUM_PRODUCTS = {
-    3: 1100,
-    6: 1470,
-    12: 2630
+    3: 1120,
+    6: 1488,
+    12: 2649
 }
 # ===================================================
 
@@ -352,19 +352,19 @@ def premium_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="💎 3 месяца — 1100 сом",
+                    text="💎 3 месяца — 1120 сом",
                     callback_data="premium_3"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 6 месяцев — 1470 сом",
+                    text="💎 6 месяцев — 1488 сом",
                     callback_data="premium_6"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 12 месяцев — 2630 сом",
+                    text="💎 12 месяцев — 2650 сом",
                     callback_data="premium_12"
                 )
             ],
