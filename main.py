@@ -744,7 +744,7 @@ GIFTS = {
     "bunny": {"name": "Зайчик", "emoji": "5393309541620291208"},
     "worker": {"name": "Рабочий", "emoji": "5447213743417105726"},
     "football": {"name": "Футбольный мишка", "emoji": "5397971251878732060"},
-    "combat_bear": {"name": "Мишка боевой", "emoji": "5470129614439362117"},
+    "masked_bear": {"name": "Мишка в маске", "emoji": "5470129614439362117"},
 }
 
 def gifts_keyboard() -> InlineKeyboardMarkup:
