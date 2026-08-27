@@ -117,8 +117,8 @@ async def init_db():
         )
     """)
     
-    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 456)")
-    await db.execute("UPDATE sqlite_sequence SET seq = 456 WHERE name = 'orders' AND seq < 456")  
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 515)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 515 WHERE name = 'orders' AND seq < 515")  
     
     await db.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -835,10 +835,7 @@ async def gift_buy(callback: CallbackQuery, state: FSMContext):
     
 @router.callback_query(F.data == "sender_anon")
 async def gift_sender_anon(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Только для админа", show_alert=True)
-        return
-
+    
     await state.update_data(gift_sender_mode="anonymous")
     await state.set_state(OrderStates.waiting_gift_username)
 
@@ -854,10 +851,7 @@ async def gift_sender_anon(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "sender_owner")
 async def gift_sender_owner(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Только для админа", show_alert=True)
-        return
-
+    
     await state.update_data(gift_sender_mode="owner")
     await state.set_state(OrderStates.waiting_gift_username)
 
@@ -1304,6 +1298,8 @@ async def payment_check(message: Message, state: FSMContext, bot: Bot):
 
     gift = data.get("gift")
     gift_text = data.get("gift_text", "")
+    gift_sender_mode = data.get("gift_sender_mode", "anonymous")
+    sender_text = "Анонимно" if gift_sender_mode == "anonymous" else "От @skobla"
 
     if order_type == "gift":
         admin_text = (
@@ -1311,6 +1307,7 @@ async def payment_check(message: Message, state: FSMContext, bot: Bot):
             f"🎁 Подарок: <b>{GIFTS[gift]['name']}</b>\n"
             f"👤 Покупатель: @{order['username']} (id: <code>{order['user_id']}</code>)\n"
             f"👤 Получатель: @{order['recipient']}\n"
+            f"👤 Отправка: <b>{sender_text}</b>\n"
             f"💌 Подпись: <b>{gift_text if gift_text else 'Без подписи'}</b>\n\n"
             f"💷 Цена: <b>{order['price']} сом</b>\n\n"
             f"👛 Прибыль за сегодня: <b>{today_profit} сом</b>\n"
