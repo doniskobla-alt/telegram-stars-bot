@@ -458,11 +458,11 @@ def gift_sender_keyboard() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="Анонимно",
-                    callback_data="gift_sender_anon"
+                    callback_data="sender_anon"
                 ),
                 InlineKeyboardButton(
                     text="От @skobla",
-                    callback_data="gift_sender_owner"
+                    callback_data="sender_owner"
                 )
             ]
         ]
@@ -827,15 +827,16 @@ async def gift_buy(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.answer(
         "<tg-emoji emoji-id='5370781982886220096'>☺</tg-emoji> "
-        "отправить подарок анонимно или от имени владельца бота?",
+        "Отправить подарок анонимно или от имени владельца бота?",
         parse_mode=ParseMode.HTML,
         reply_markup=gift_sender_keyboard()
     )
     await callback.answer()
     
-@router.callback_query(F.data == "gift_sender_anon")
+@router.callback_query(F.data == "sender_anon")
 async def gift_sender_anon(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Только для админа", show_alert=True)
         return
 
     await state.update_data(gift_sender_mode="anonymous")
@@ -851,9 +852,10 @@ async def gift_sender_anon(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data == "gift_sender_owner")
+@router.callback_query(F.data == "sender_owner")
 async def gift_sender_owner(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Только для админа", show_alert=True)
         return
 
     await state.update_data(gift_sender_mode="owner")
@@ -865,6 +867,8 @@ async def gift_sender_owner(callback: CallbackQuery, state: FSMContext):
         "<code>@skobla</code>",
         parse_mode=ParseMode.HTML
     )
+
+    await callback.answer()
 
     await callback.answer()
 
