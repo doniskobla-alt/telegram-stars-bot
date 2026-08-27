@@ -20,6 +20,7 @@ from aiogram.enums import ParseMode
 
 # ==================== НАСТРОЙКИ ====================
 import os
+import random
 
 BOT_TOKEN = "8806014952:AAEOdo5oRocCptUJrT5Yx23nnSTG7pb-_0I"
 ADMIN_ID = 5598701749
@@ -170,8 +171,8 @@ async def init_db():
         )
     """)
 
-    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 567)")
-    await db.execute("UPDATE sqlite_sequence SET seq = 567 WHERE name = 'orders' AND seq < 567")
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 599)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 599 WHERE name = 'orders' AND seq < 599")
 
     await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -471,6 +472,23 @@ async def count_participants(giveaway_id: int) -> int:
     )
     row = await cursor.fetchone()
     return row[0] if row else 0
+    
+async def get_giveaway_participants(giveaway_id: int):
+    cursor = await db.execute(
+        """
+        SELECT user_id, username
+        FROM giveaway_participants
+        WHERE giveaway_id = ?
+        """,
+        (giveaway_id,)
+    )
+    rows = await cursor.fetchall()
+    return rows
+
+
+async def get_giveaway_join_link(bot: Bot, giveaway_id: int) -> str:
+    me = await bot.get_me()
+    return f"https://t.me/{me.username}?start=g{giveaway_id}"
 
 def catalog_keyboard() -> InlineKeyboardMarkup:
     buttons = []
@@ -749,14 +767,17 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
                 referrer_id=None
             )
 
-            total = await count_participants(giveaway_id)
+    total = await count_participants(giveaway_id)
 
-            await message.answer(
+    join_link = await get_giveaway_join_link(bot, giveaway_id)
+
+    await message.answer(
                 "✅ Вы успешно приняли участие!\n\n"
-                "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n\n"
+                "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n"
+                f"🔗 Ваша ссылка: {join_link}\n\n"
                 f"🎟 Участников в розыгрыше: {total}"
             )
-            return
+    return
 
     text = (
         '<tg-emoji emoji-id="5330033399061037873">☺</tg-emoji>    <b>Приветствуем!</b><tg-emoji emoji-id="5271803701340706125">☺</tg-emoji>\n\n'
@@ -806,12 +827,90 @@ async def check_giveaway(callback: CallbackQuery, bot: Bot):
 
     total = await count_participants(giveaway_id)
 
+    join_link = await get_giveaway_join_link(bot, giveaway_id)
+
     await callback.message.edit_text(
         "✅ Вы успешно приняли участие!\n\n"
-        "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n\n"
+        "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n"
+        f"🔗 Ваша ссылка: {join_link}\n\n"
         f"🎟 Участников в розыгрыше: {total}"
     )
     await callback.answer()
+    
+@router.message(F.text.startswith("/end"))
+async def end_giveaway_command(message: Message, bot: Bot):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    text = message.text.strip().lower().replace(" ", "")
+    giveaway_id_text = text.replace("/end", "", 1)
+
+    if not giveaway_id_text.isdigit():
+        await message.answer("Использование:\n/end1")
+        return
+
+    giveaway_id = int(giveaway_id_text)
+    giveaway = await get_giveaway(giveaway_id)
+
+    if not giveaway:
+        await message.answer("❌ Розыгрыш не найден.")
+        return
+
+    if giveaway["status"] != "active":
+        await message.answer("❌ Этот розыгрыш уже завершён.")
+        return
+
+    participants_rows = await get_giveaway_participants(giveaway_id)
+
+    if not participants_rows:
+        await db.execute(
+            "UPDATE giveaways SET status = 'ended', ended_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), giveaway_id)
+        )
+        await db.commit()
+
+        await message.answer("❌ В розыгрыше нет участников.")
+        return
+
+    winners_count = giveaway["winners_count"]
+    winners_pool = participants_rows[:]
+
+    if len(winners_pool) > winners_count:
+        winners = random.sample(winners_pool, k=winners_count)
+    else:
+        winners = winners_pool
+
+    await db.execute(
+        "UPDATE giveaways SET status = 'ended', ended_at = ? WHERE id = ?",
+        (datetime.now().isoformat(), giveaway_id)
+    )
+    await db.commit()
+
+    result_lines = []
+    for idx, winner in enumerate(winners, start=1):
+        user_id, username = winner
+        if username and username != "без_username":
+            winner_text = f"@{username}"
+        else:
+            winner_text = "победитель"
+
+        result_lines.append(
+            f"#{idx} » <a href=\"tg://user?id={user_id}\">{winner_text}</a>"
+        )
+
+    result_text = "🎉 Результаты розыгрыша:\n\n" + "\n".join(result_lines)
+
+    try:
+        await bot.send_message(
+            chat_id=giveaway["post_channel"],
+            text=result_text,
+            parse_mode=ParseMode.HTML
+        )
+    except Exception as e:
+        await message.answer(f"❌ Результаты не удалось отправить в канал: {e}")
+        return
+
+    await message.answer(f"✅ Розыгрыш #{giveaway_id} завершён.")
 
 @router.message(Command("catalog"))
 async def cmd_catalog(message: Message, state: FSMContext):
