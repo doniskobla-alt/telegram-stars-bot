@@ -1457,13 +1457,67 @@ async def giveaway_waiting_publish_time(message: Message, state: FSMContext, bot
         publish_now=1
     )
 
+    me = await bot.get_me()
+    join_link = f"https://t.me/{me.username}?start=g{giveaway_id}"
+
+    giveaway_text = data["giveaway_text"]
+    photo_id = data.get("giveaway_photo_id")
+    post_channel = data["post_channel"]
+    sub_channel = data["sub_channel"]
+    winners_count = data["winners_count"]
+
+    post_text = (
+        f"{giveaway_text}\n\n"
+        f"👥 Победителей: {winners_count}\n"
+        f"📌 Подписка: {sub_channel}\n"
+        f"🎟 Участие через бота:"
+    )
+
+    markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Участвовать",
+                    url=join_link
+                )
+            ]
+        ]
+    )
+
+    try:
+        if photo_id:
+            sent = await bot.send_photo(
+                chat_id=post_channel,
+                photo=photo_id,
+                caption=post_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=markup
+            )
+        else:
+            sent = await bot.send_message(
+                chat_id=post_channel,
+                text=post_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=markup
+            )
+
+        await db.execute(
+            "UPDATE giveaways SET post_message_id = ? WHERE id = ?",
+            (sent.message_id, giveaway_id)
+        )
+        await db.commit()
+
+    except Exception as e:
+        await message.answer(f"❌ Не удалось опубликовать розыгрыш в канал: {e}")
+        return
+
     await state.clear()
 
     await message.answer(
-        f"✅ Розыгрыш #{giveaway_id} создан.\n"
-        f"Канал публикации: {data['post_channel']}\n"
-        f"Канал подписки: {data['sub_channel']}\n"
-        f"Победителей: {data['winners_count']}\n"
+        f"✅ Розыгрыш #{giveaway_id} создан и опубликован.\n"
+        f"Канал публикации: {post_channel}\n"
+        f"Канал подписки: {sub_channel}\n"
+        f"Победителей: {winners_count}\n"
         f"Публикуем сразу: да"
     )
     
