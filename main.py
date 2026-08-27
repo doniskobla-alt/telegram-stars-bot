@@ -99,6 +99,13 @@ class OrderStates(StatesGroup):
 
     waiting_premium_username = State()
     
+class GiveawayStates(StatesGroup):
+    waiting_text = State()
+    waiting_winners = State()
+    waiting_post_channel = State()
+    waiting_sub_channel = State()
+    waiting_publish_time = State()
+    
 async def init_db():
     global db
     db = await aiosqlite.connect("orders.db")
@@ -117,8 +124,8 @@ async def init_db():
         )
     """)
     
-    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 515)")
-    await db.execute("UPDATE sqlite_sequence SET seq = 515 WHERE name = 'orders' AND seq < 515")  
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 567)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 567 WHERE name = 'orders' AND seq < 567")  
     
     await db.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -128,12 +135,85 @@ async def init_db():
         last_seen TEXT NOT NULL
     )
 """)
-    
+
+    await db.execute("""
+    CREATE TABLE IF NOT EXISTS giveaways (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        creator_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        winners_count INTEGER NOT NULL,
+        post_channel TEXT NOT NULL,
+        sub_channel TEXT NOT NULL,
+        publish_now INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'active',
+        post_message_id INTEGER,
+        created_at TEXT NOT NULL,
+        ended_at TEXT
+    )
+""")
+
+async def init_db():
+    global db
+    db = await aiosqlite.connect("orders.db")
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            username TEXT,
+            recipient TEXT NOT NULL,
+            stars INTEGER NOT NULL,
+            price INTEGER NOT NULL,
+            product_type TEXT DEFAULT 'stars',
+            status TEXT DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            completed_at TEXT
+        )
+    """)
+
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 567)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 567 WHERE name = 'orders' AND seq < 567")
+
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            first_name TEXT,
+            last_seen TEXT NOT NULL
+        )
+    """)
+
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS giveaways (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            creator_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            winners_count INTEGER NOT NULL,
+            post_channel TEXT NOT NULL,
+            sub_channel TEXT NOT NULL,
+            publish_now INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'active',
+            post_message_id INTEGER,
+            created_at TEXT NOT NULL,
+            ended_at TEXT
+        )
+    """)
+
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS giveaway_participants (
+            giveaway_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            username TEXT,
+            referrer_id INTEGER,
+            joined_at TEXT NOT NULL,
+            PRIMARY KEY (giveaway_id, user_id)
+        )
+    """)
+
     try:
         await db.execute("ALTER TABLE orders ADD COLUMN product_type TEXT DEFAULT 'stars'")
     except:
         pass
-        
+
     await db.execute("""
         CREATE TABLE IF NOT EXISTS bot_settings (
             key TEXT PRIMARY KEY,
@@ -145,14 +225,14 @@ async def init_db():
         INSERT OR IGNORE INTO bot_settings (key, value)
         VALUES ('sleep_mode', '0')
     """)
-        
+
     await db.execute("""
-    CREATE TABLE IF NOT EXISTS banned_users (
-        user_id INTEGER PRIMARY KEY,
-        reason TEXT,
-        banned_at TEXT NOT NULL
-    )
-""")
+        CREATE TABLE IF NOT EXISTS banned_users (
+            user_id INTEGER PRIMARY KEY,
+            reason TEXT,
+            banned_at TEXT NOT NULL
+        )
+    """)
 
     await db.commit()
 
@@ -319,6 +399,70 @@ async def get_all_user_ids():
     cursor = await db.execute("SELECT user_id FROM users")
     rows = await cursor.fetchall()
     return [row[0] for row in rows]
+    
+async def create_giveaway(
+    creator_id: int,
+    text: str,
+    winners_count: int,
+    post_channel: str,
+    sub_channel: str,
+    publish_now: int = 1,
+) -> int:
+    now = datetime.now().isoformat()
+    cursor = await db.execute(
+        """
+        INSERT INTO giveaways (
+            creator_id, text, winners_count, post_channel, sub_channel,
+            publish_now, status, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'active', ?)
+        """,
+        (creator_id, text, winners_count, post_channel, sub_channel, publish_now, now)
+    )
+    await db.commit()
+    return cursor.lastrowid
+
+
+async def get_giveaway(giveaway_id: int) -> dict | None:
+    cursor = await db.execute(
+        "SELECT * FROM giveaways WHERE id = ?",
+        (giveaway_id,)
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    columns = [desc[0] for desc in cursor.description]
+    return dict(zip(columns, row))
+
+
+async def has_participant(giveaway_id: int, user_id: int) -> bool:
+    cursor = await db.execute(
+        """
+        SELECT 1
+        FROM giveaway_participants
+        WHERE giveaway_id = ? AND user_id = ?
+        """,
+        (giveaway_id, user_id)
+    )
+    return await cursor.fetchone() is not None
+
+
+async def add_participant(
+    giveaway_id: int,
+    user_id: int,
+    username: str,
+    referrer_id: int | None = None
+):
+    now = datetime.now().isoformat()
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO giveaway_participants
+        (giveaway_id, user_id, username, referrer_id, joined_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (giveaway_id, user_id, username, referrer_id, now)
+    )
+    await db.commit()
 
 def catalog_keyboard() -> InlineKeyboardMarkup:
     buttons = []
@@ -1212,6 +1356,115 @@ async def cmd_broadcast(message: Message, bot: Bot):
         f"Рассылка завершена.\n"
         f"Отправлено: {sent}\n"
         f"Не дошло: {failed}"
+    )
+    
+@router.message(Command("newgive"))
+async def cmd_newgive(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    await state.clear()
+    await state.set_state(GiveawayStates.waiting_text)
+
+    await message.answer("✏️ Отправьте текст розыгрыша (можно с фото)")
+    
+@router.message(GiveawayStates.waiting_text)
+async def giveaway_waiting_text(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    text = message.text or message.caption
+    if not text:
+        await message.answer("Нужно отправить текст. Можно также фото с подписью.")
+        return
+
+    photo_id = message.photo[-1].file_id if message.photo else None
+
+    await state.update_data(
+        giveaway_text=text,
+        giveaway_photo_id=photo_id
+    )
+    await state.set_state(GiveawayStates.waiting_winners)
+
+    await message.answer("Укажите количество победителей в розыгрыше.")
+    
+@router.message(GiveawayStates.waiting_winners)
+async def giveaway_waiting_winners(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    try:
+        winners_count = int(message.text.strip())
+    except ValueError:
+        await message.answer("Количество победителей должно быть числом.")
+        return
+
+    if winners_count < 1:
+        await message.answer("Нужно минимум 1 победитель.")
+        return
+
+    await state.update_data(winners_count=winners_count)
+    await state.set_state(GiveawayStates.waiting_post_channel)
+
+    await message.answer("Выберите канал, в котором будет опубликован розыгрыш.\n\nНапишите @username канала.")
+    
+@router.message(GiveawayStates.waiting_post_channel)
+async def giveaway_waiting_post_channel(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    post_channel = message.text.strip()
+
+    await state.update_data(post_channel=post_channel)
+    await state.set_state(GiveawayStates.waiting_sub_channel)
+
+    await message.answer("Добавьте канал, на который должна быть обязательная подписка.\n\nНапишите @username канала.")
+    
+@router.message(GiveawayStates.waiting_sub_channel)
+async def giveaway_waiting_sub_channel(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    sub_channel = message.text.strip()
+
+    await state.update_data(sub_channel=sub_channel)
+    await state.set_state(GiveawayStates.waiting_publish_time)
+
+    await message.answer(
+        "Когда публикуем розыгрыш?\n\n"
+        "Варианты: сразу после создания"
+    )
+    
+@router.message(GiveawayStates.waiting_publish_time)
+async def giveaway_waiting_publish_time(message: Message, state: FSMContext, bot: Bot):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    text = message.text.strip().lower()
+
+    if "сразу" not in text:
+        await message.answer("Пока поддерживается только вариант: сразу после создания")
+        return
+
+    data = await state.get_data()
+
+    giveaway_id = await create_giveaway(
+        creator_id=message.from_user.id,
+        text=data["giveaway_text"],
+        winners_count=data["winners_count"],
+        post_channel=data["post_channel"],
+        sub_channel=data["sub_channel"],
+        publish_now=1
+    )
+
+    await state.clear()
+
+    await message.answer(
+        f"✅ Розыгрыш #{giveaway_id} создан.\n"
+        f"Канал публикации: {data['post_channel']}\n"
+        f"Канал подписки: {data['sub_channel']}\n"
+        f"Победителей: {data['winners_count']}\n"
+        f"Публикуем сразу: да"
     )
     
 @router.message(OrderStates.waiting_recipient)
