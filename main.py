@@ -94,6 +94,7 @@ class OrderStates(StatesGroup):
     waiting_recipient = State()
     waiting_gift_username = State()
     waiting_gift_text = State()
+    waiting_gift_sender_choice = State()
     waiting_payment_check = State()
 
     waiting_premium_username = State()
@@ -446,6 +447,22 @@ text="85 сом",
                     text="Назад",
                     icon_custom_emoji_id="5280911767902378209",
                     callback_data="back_main"
+                )
+            ]
+        ]
+    )
+    
+def gift_sender_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Анонимно",
+                    callback_data="gift_sender_anon"
+                ),
+                InlineKeyboardButton(
+                    text="От @skobla",
+                    callback_data="gift_sender_owner"
                 )
             ]
         ]
@@ -806,16 +823,49 @@ async def gift_buy(callback: CallbackQuery, state: FSMContext):
         gift=gift,
         price=85
     )
+    await state.set_state(OrderStates.waiting_gift_sender_choice)
+
+    await callback.message.answer(
+        "<tg-emoji emoji-id='5370781982886220096'>☺</tg-emoji> "
+        "отправить подарок анонимно или от имени владельца бота?",
+        parse_mode=ParseMode.HTML,
+        reply_markup=gift_sender_keyboard()
+    )
+    await callback.answer()
+    
+@router.callback_query(F.data == "gift_sender_anon")
+async def gift_sender_anon(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        return
+
+    await state.update_data(gift_sender_mode="anonymous")
     await state.set_state(OrderStates.waiting_gift_username)
 
     await callback.message.answer(
-        "<tg-emoji emoji-id='5370781982886220096'>☺</tg-emoji><b>Удалённый подарок</b>\n\n"
-        "<tg-emoji emoji-id='5262495450648300372'>☺</tg-emoji> Стоимость: <b>85 сом</b>\n\n"
         "<tg-emoji emoji-id='5879770735999717115'>☺</tg-emoji>Теперь отправьте username получателя.\n\n"
         "Пример:\n"
         "<code>@skobla</code>",
         parse_mode=ParseMode.HTML
     )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "gift_sender_owner")
+async def gift_sender_owner(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        return
+
+    await state.update_data(gift_sender_mode="owner")
+    await state.set_state(OrderStates.waiting_gift_username)
+
+    await callback.message.answer(
+        "<tg-emoji emoji-id='5879770735999717115'>☺</tg-emoji>Теперь отправьте username получателя.\n\n"
+        "Пример:\n"
+        "<code>@skobla</code>",
+        parse_mode=ParseMode.HTML
+    )
+
     await callback.answer()
 
 @router.message(OrderStates.waiting_gift_username)
@@ -846,6 +896,8 @@ async def gift_text(message: Message, state: FSMContext):
     gift = data["gift"]
     recipient = data["recipient"]
     price = data["price"]
+    gift_sender_mode = data.get("gift_sender_mode", "anonymous")
+    sender_text = "Анонимно" if gift_sender_mode == "anonymous" else "От @skobla"
     user = message.from_user
     username = user.username or "без_username"
 
@@ -867,6 +919,7 @@ async def gift_text(message: Message, state: FSMContext):
     caption = (
         f"<tg-emoji emoji-id='5204234309472372120'>☺</tg-emoji><b>Заказ #{order_id} создан</b>\n\n"
         f"<tg-emoji emoji-id='5370781982886220096'>☺</tg-emoji> Подарок: <b>{GIFTS[gift]['name']}</b>\n"
+        f"👤 Отправка: <b>{sender_text}</b>\n"
         f"👤 Получатель: <b>@{recipient}</b>\n"
         f"<tg-emoji emoji-id='5258500400918587241'>☺</tg-emoji>Подпись: <b>{gift_text if gift_text else 'Без подписи'}</b>\n"
         f"<tg-emoji emoji-id='5262495450648300372'>☺</tg-emoji>К оплате: <b>{price} сом</b>\n\n"
