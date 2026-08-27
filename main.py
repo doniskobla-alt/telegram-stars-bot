@@ -124,8 +124,8 @@ async def init_db():
         )
     """)
     
-    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 567)")
-    await db.execute("UPDATE sqlite_sequence SET seq = 567 WHERE name = 'orders' AND seq < 567")  
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 598)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 598 WHERE name = 'orders' AND seq < 598")  
     
     await db.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -463,6 +463,14 @@ async def add_participant(
         (giveaway_id, user_id, username, referrer_id, now)
     )
     await db.commit()
+    
+async def count_participants(giveaway_id: int) -> int:
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM giveaway_participants WHERE giveaway_id = ?",
+        (giveaway_id,)
+    )
+    row = await cursor.fetchone()
+    return row[0] if row else 0
 
 def catalog_keyboard() -> InlineKeyboardMarkup:
     buttons = []
@@ -682,12 +690,73 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     )
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, bot: Bot):
     if await is_banned(message.from_user.id):
         return
 
     await save_user(message.from_user)
     await state.clear()
+
+    parts = message.text.split(maxsplit=1)
+
+    if len(parts) > 1 and parts[1].startswith("g"):
+        giveaway_id_text = parts[1][1:]
+
+        if giveaway_id_text.isdigit():
+            giveaway_id = int(giveaway_id_text)
+            giveaway = await get_giveaway(giveaway_id)
+
+            if not giveaway or giveaway["status"] != "active":
+                await message.answer("❌ Розыгрыш не найден или уже завершён.")
+                return
+
+            if await has_participant(giveaway_id, message.from_user.id):
+                await message.answer("☑️ Вы уже приняли участие в розыгрыше!")
+                return
+
+            try:
+                member = await bot.get_chat_member(
+                    giveaway["sub_channel"],
+                    message.from_user.id
+                )
+                subscribed = member.status in ("member", "administrator", "creator")
+            except Exception:
+                subscribed = False
+
+            if not subscribed:
+                await message.answer(
+                    "⚠️ Для участия в розыгрыше нужно подписаться на каналы:\n\n"
+                    f"• Канал » {giveaway['sub_channel']}\n\n"
+                    "📖 После подписки попробуйте снова:",
+                    reply_markup=InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [
+                                InlineKeyboardButton(
+                                    text="Проверить",
+                                    callback_data=f"check_giveaway_{giveaway_id}"
+                                )
+                            ]
+                        ]
+                    )
+                )
+                return
+
+            username = message.from_user.username or "без_username"
+            await add_participant(
+                giveaway_id=giveaway_id,
+                user_id=message.from_user.id,
+                username=username,
+                referrer_id=None
+            )
+
+            total = await count_participants(giveaway_id)
+
+            await message.answer(
+                "✅ Вы успешно приняли участие!\n\n"
+                "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n\n"
+                f"🎟 Участников в розыгрыше: {total}"
+            )
+            return
 
     text = (
         '<tg-emoji emoji-id="5330033399061037873">☺</tg-emoji>    <b>Приветствуем!</b><tg-emoji emoji-id="5271803701340706125">☺</tg-emoji>\n\n'
@@ -703,6 +772,46 @@ async def cmd_start(message: Message, state: FSMContext):
         reply_markup=main_menu_keyboard()
     )
 
+@router.callback_query(F.data.startswith("check_giveaway_"))
+async def check_giveaway(callback: CallbackQuery, bot: Bot):
+    giveaway_id = int(callback.data.split("_")[-1])
+    giveaway = await get_giveaway(giveaway_id)
+
+    if not giveaway or giveaway["status"] != "active":
+        await callback.answer("Розыгрыш не найден или уже завершён.", show_alert=True)
+        return
+
+    if await has_participant(giveaway_id, callback.from_user.id):
+        await callback.message.edit_text("☑️ Вы уже приняли участие в розыгрыше!")
+        await callback.answer()
+        return
+
+    try:
+        member = await bot.get_chat_member(giveaway["sub_channel"], callback.from_user.id)
+        subscribed = member.status in ("member", "administrator", "creator")
+    except Exception:
+        subscribed = False
+
+    if not subscribed:
+        await callback.answer("Подписка не найдена.", show_alert=True)
+        return
+
+    username = callback.from_user.username or "без_username"
+    await add_participant(
+        giveaway_id=giveaway_id,
+        user_id=callback.from_user.id,
+        username=username,
+        referrer_id=None
+    )
+
+    total = await count_participants(giveaway_id)
+
+    await callback.message.edit_text(
+        "✅ Вы успешно приняли участие!\n\n"
+        "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n\n"
+        f"🎟 Участников в розыгрыше: {total}"
+    )
+    await callback.answer()
 
 @router.message(Command("catalog"))
 async def cmd_catalog(message: Message, state: FSMContext):
@@ -1460,18 +1569,8 @@ async def giveaway_waiting_publish_time(message: Message, state: FSMContext, bot
     me = await bot.get_me()
     join_link = f"https://t.me/{me.username}?start=g{giveaway_id}"
 
-    giveaway_text = data["giveaway_text"]
+    post_text = data["giveaway_text"]
     photo_id = data.get("giveaway_photo_id")
-    post_channel = data["post_channel"]
-    sub_channel = data["sub_channel"]
-    winners_count = data["winners_count"]
-
-    post_text = (
-        f"{giveaway_text}\n\n"
-        f"👥 Победителей: {winners_count}\n"
-        f"📌 Подписка: {sub_channel}\n"
-        f"🎟 Участие через бота:"
-    )
 
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -1487,7 +1586,7 @@ async def giveaway_waiting_publish_time(message: Message, state: FSMContext, bot
     try:
         if photo_id:
             sent = await bot.send_photo(
-                chat_id=post_channel,
+                chat_id=data["post_channel"],
                 photo=photo_id,
                 caption=post_text,
                 parse_mode=ParseMode.HTML,
@@ -1495,7 +1594,7 @@ async def giveaway_waiting_publish_time(message: Message, state: FSMContext, bot
             )
         else:
             sent = await bot.send_message(
-                chat_id=post_channel,
+                chat_id=data["post_channel"],
                 text=post_text,
                 parse_mode=ParseMode.HTML,
                 reply_markup=markup
@@ -1513,13 +1612,7 @@ async def giveaway_waiting_publish_time(message: Message, state: FSMContext, bot
 
     await state.clear()
 
-    await message.answer(
-        f"✅ Розыгрыш #{giveaway_id} создан и опубликован.\n"
-        f"Канал публикации: {post_channel}\n"
-        f"Канал подписки: {sub_channel}\n"
-        f"Победителей: {winners_count}\n"
-        f"Публикуем сразу: да"
-    )
+    await message.answer(f"✅ Розыгрыш #{giveaway_id} создан и опубликован.")
     
 @router.message(OrderStates.waiting_recipient)
 async def recipient_input(message: Message, state: FSMContext):
