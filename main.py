@@ -171,8 +171,8 @@ async def init_db():
         )
     """)
 
-    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 599)")
-    await db.execute("UPDATE sqlite_sequence SET seq = 599 WHERE name = 'orders' AND seq < 599")
+    await db.execute("INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES('orders', 603)")
+    await db.execute("UPDATE sqlite_sequence SET seq = 603 WHERE name = 'orders' AND seq < 603")
 
     await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -759,7 +759,7 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
                 )
                 return
 
-                username = message.from_user.username or "без_username"
+            username = message.from_user.username or "без_username"
             await add_participant(
                 giveaway_id=giveaway_id,
                 user_id=message.from_user.id,
@@ -772,7 +772,7 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
 
             await message.answer(
                 "✅ Вы успешно приняли участие!\n\n"
-                "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n"
+                "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных# шансов на выигрыш.\n"
                 f"🔗 Ваша ссылка: {join_link}\n\n"
                 f"🎟 Участников в розыгрыше: {total}"
             )
