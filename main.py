@@ -759,7 +759,7 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
                 )
                 return
 
-            username = message.from_user.username or "без_username"
+                username = message.from_user.username or "без_username"
             await add_participant(
                 giveaway_id=giveaway_id,
                 user_id=message.from_user.id,
@@ -767,17 +767,16 @@ async def cmd_start(message: Message, state: FSMContext, bot: Bot):
                 referrer_id=None
             )
 
-    total = await count_participants(giveaway_id)
+            total = await count_participants(giveaway_id)
+            join_link = await get_giveaway_join_link(bot, giveaway_id)
 
-    join_link = await get_giveaway_join_link(bot, giveaway_id)
-
-    await message.answer(
+            await message.answer(
                 "✅ Вы успешно приняли участие!\n\n"
                 "👤 Приглашайте друзей участвовать в розыгрыше по данной ссылке для дополнительных шансов на выигрыш.\n"
                 f"🔗 Ваша ссылка: {join_link}\n\n"
                 f"🎟 Участников в розыгрыше: {total}"
             )
-    return
+            return
 
     text = (
         '<tg-emoji emoji-id="5330033399061037873">☺</tg-emoji>    <b>Приветствуем!</b><tg-emoji emoji-id="5271803701340706125">☺</tg-emoji>\n\n'
@@ -826,7 +825,6 @@ async def check_giveaway(callback: CallbackQuery, bot: Bot):
     )
 
     total = await count_participants(giveaway_id)
-
     join_link = await get_giveaway_join_link(bot, giveaway_id)
 
     await callback.message.edit_text(
